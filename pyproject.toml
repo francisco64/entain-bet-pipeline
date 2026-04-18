@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bet-pipeline"
+version = "0.1.0"
+description = "Small local batch pipeline for validating bets and building customer features"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "duckdb",
+    "numpy",
+    "pandas",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+bet-pipeline = "bet_pipeline.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

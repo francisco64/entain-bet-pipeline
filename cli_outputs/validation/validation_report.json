@@ -1,0 +1,29 @@
+{
+  "total_bets_input": 372296,
+  "total_valid_bets": 371432,
+  "total_invalid_bets": 864,
+  "unique_customers_input": 5000,
+  "unique_customers_with_valid_bets": 5000,
+  "users_removed_all_bets_invalid": 0,
+  "invalid_by_rule": {
+    "duplicate_bet_id": 0,
+    "invalid_bet_datetime": 0,
+    "bet_num_not_positive_integer": 0,
+    "duplicate_customer_bet_num": 0,
+    "betting_amount_not_gt_0": 835,
+    "price_not_gt_1": 5,
+    "invalid_category": 0,
+    "invalid_stake_type": 0,
+    "invalid_bet_result": 0,
+    "payout_mismatch": 3,
+    "return_for_entain_mismatch": 30
+  },
+  "first_20_window_health": {
+    "window_definition": "raw bet_num between 1 and 20 inclusive",
+    "users_with_at_least_1_invalid_bet_in_first_20": 206,
+    "total_bets_in_first_20_window": 100000,
+    "invalid_bets_in_first_20_window": 212,
+    "pct_invalid_bets_in_first_20_window": 0.00212,
+    "users_with_invalid_first_bet": 9
+  }
+}

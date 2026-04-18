@@ -2,8 +2,6 @@
 
 This project builds a small local batch pipeline around `bets.csv`.
 
-At this stage I only implemented the Python core logic under `src/bet_pipeline`. I have not added CLI wiring, tests, Docker, or packaging details yet because I wanted to get the data logic clear first.
-
 ## What the pipeline does
 
 There are two stages.
@@ -181,17 +179,32 @@ DuckDB can read the parquet file directly in the `FROM` clause, so I kept the SQ
 ## Current project files
 
 ```text
+pyproject.toml
 src/
   bet_pipeline/
     __init__.py
+    cli.py
     schema.py
     validate.py
     build_features.py
 ```
 
-## How to run the current core pipeline
+## Packaging assumptions
 
-There is no CLI yet, so the current flow is to call the Python functions directly:
+I assume `pytest` is only needed for testing and not for running the pipeline itself. Because of that, it is placed under optional development dependencies in `pyproject.toml` rather than the main runtime dependency list.
+
+## How to run the pipeline
+
+After installing the package, the CLI supports these commands:
+
+```bash
+bet-pipeline validate --input bets.csv --output outputs/validation
+bet-pipeline build-features --input bets.csv --output outputs/features
+```
+
+The `build-features` command takes the raw CSV input, runs validation internally, and then builds the customer feature parquet from the validated bets. This keeps the CLI aligned with the task statement while still ensuring features are built only from validated data.
+
+You can also call the Python functions directly:
 
 ```python
 from bet_pipeline.validate import run_validation
