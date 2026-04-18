@@ -119,7 +119,7 @@ bet_id,customer_id,bet_datetime,bet_num,betting_amount,price,category,stake_type
 149048,638e8615-0a25-4fcc-bb87-6cd350c4a1c9,2024-10-07 12:09:51.019,59,0.0,17.2,sports,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 260328,127bcb93-60f6-4501-804d-c237ed82fd4b,2024-10-27 17:10:04.024,70,0.0,8.66,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 238836,40a77bea-de77-4bfd-9dd1-7410db3c6ba4,2024-08-09 00:45:55.017,9,0.0,10.3,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
-371735,fa1699f5-4db0-4cfa-ad27-cccabffc05b4,2024-09-27 20:51:07.018,56,6.7,9.45,racing,bonus,no-return,0.0,-56.614999999999995,0.0,0.0,return_for_entain_mismatch
+371735,fa1699f5-4db0-4cfa-ad27-cccabffc05b4,2024-09-27 20:51:07.018,56,6.7,9.45,racing,bonus,no-return,0.0,-56.615,0.0,0.0,return_for_entain_mismatch
 86220,80c7a5fb-4d8e-4c07-b5e7-cab0f22c02e3,2024-08-19 01:45:30.032,10,0.0,12.13,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 276935,54140409-4460-4f62-b1c6-4e502f72c7bb,2024-09-06 21:31:34.003,27,0.0,20.13,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 7434,597dc211-9ffa-4746-9167-f6718df8557b,2024-09-10 07:40:47.042,33,0.0,14.61,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
@@ -366,7 +366,7 @@ bet_id,customer_id,bet_datetime,bet_num,betting_amount,price,category,stake_type
 159980,46549839-da09-4052-bc62-53264e378637,2024-10-15 17:17:27.030,72,0.0,3.25,sports,cash,return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 224601,df0caec6-f104-4155-bdb0-b90c423d5b17,2024-09-18 15:45:27.020,32,0.0,7.11,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 81820,886eb262-97a5-4c33-b102-27ae0538b0b5,2024-09-24 15:41:25.009,36,0.0,7.91,sports,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
-62619,dd14ede9-af28-4b48-afc3-e9170678769a,2024-09-12 19:56:05.032,20,6.0,9.04,racing,cash,no-return,0.0,-48.239999999999995,0.0,6.0,return_for_entain_mismatch
+62619,dd14ede9-af28-4b48-afc3-e9170678769a,2024-09-12 19:56:05.032,20,6.0,9.04,racing,cash,no-return,0.0,-48.24,0.0,6.0,return_for_entain_mismatch
 233296,e7a5237c-b4ab-4707-883a-f27c91beb3c6,2024-09-27 13:06:18.056,60,6.8,4.28,sports,bonus,no-return,0.0,376620.1493360442,0.0,0.0,return_for_entain_mismatch
 216446,9c7870ce-57fb-40cb-9a55-b9db8d861870,2024-11-03 08:38:41.014,80,0.0,13.57,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 283280,5c784ae1-2b29-4cdb-afd8-c9318ebe168b,2024-10-24 02:10:14.010,86,0.0,9.58,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
@@ -481,7 +481,7 @@ bet_id,customer_id,bet_datetime,bet_num,betting_amount,price,category,stake_type
 228721,f1999c6d-09fb-4424-8766-a90833ffed7f,2024-10-24 16:20:16.000,70,0.0,2.46,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 172329,2c48dea3-ad2c-4580-83c1-e7e6f664333d,2024-09-02 20:42:37.019,26,0.0,19.7,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 279852,a0390b6b-36ef-451c-bab6-dbc26c13050e,2024-10-15 00:57:47.027,53,0.0,5.31,racing,cash,return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
-147975,83c7066b-3991-4d06-a5b1-69dbb76bd50d,2024-08-31 18:16:53.006,9,-26.899400505464214,18.82,sports,cash,no-return,0.0,3.2,0.0,-26.899400505464214,"betting_amount_not_gt_0,return_for_entain_mismatch"
+147975,83c7066b-3991-4d06-a5b1-69dbb76bd50d,2024-08-31 18:16:53.006,9,-26.89940050546421,18.82,sports,cash,no-return,0.0,3.2,0.0,-26.89940050546421,"betting_amount_not_gt_0,return_for_entain_mismatch"
 165624,34ce8f74-9408-4e4e-9f2f-e023169cfa9e,2024-09-29 06:13:50.026,32,0.0,3.2,sports,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 333254,2c31600c-c145-41cd-a03f-1042771d167d,2024-10-02 01:04:37.055,55,0.0,11.87,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 62257,04b3e85d-2318-4823-89c7-0e22226c846e,2024-09-06 14:59:40.051,19,0.0,8.7,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
@@ -541,7 +541,7 @@ bet_id,customer_id,bet_datetime,bet_num,betting_amount,price,category,stake_type
 366009,221c9273-584b-4e07-ad2f-e01fe7dfc258,2024-09-17 05:29:44.003,27,0.0,14.11,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 152331,2f953f47-b461-4c27-8f3f-748f8b4631c8,2024-11-10 23:41:00.022,79,0.0,3.69,racing,cash,return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 256533,fd88a5f9-6869-43f0-953c-0fa8caf456c3,2024-10-27 02:54:15.039,85,0.0,3.46,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
-268583,90308b0a-1778-47d7-a799-1c07bef3568c,2024-08-25 01:09:34.056,22,14.0,5.39,racing,bonus,no-return,0.0,-61.459999999999994,0.0,0.0,return_for_entain_mismatch
+268583,90308b0a-1778-47d7-a799-1c07bef3568c,2024-08-25 01:09:34.056,22,14.0,5.39,racing,bonus,no-return,0.0,-61.46,0.0,0.0,return_for_entain_mismatch
 300705,94310f42-5a3c-4bcb-912f-b4fe0e2cc6a0,2024-08-10 03:48:40.052,8,0.0,21.33,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 279052,e34faa65-70e1-4d15-a897-e66031b099fe,2024-09-11 21:57:00.013,40,0.0,15.48,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 76523,f0317811-a347-48a6-b5f7-30839f952464,2024-10-23 16:55:35.011,87,0.0,16.29,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
@@ -551,7 +551,7 @@ bet_id,customer_id,bet_datetime,bet_num,betting_amount,price,category,stake_type
 364493,a46456fe-2cbc-4b83-837a-dad074ecf401,2024-09-08 02:24:10.029,29,0.0,3.83,racing,cash,return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 79050,766dfe12-ff41-4b4e-a7bf-76767f4efa94,2024-10-26 16:18:40.037,83,0.0,15.87,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 267102,6fd8e13d-36e0-448a-805f-7a28eb70b5a5,2024-10-14 15:26:40.002,68,0.0,13.03,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
-252145,62c1387d-b4b7-414c-ae50-c6b149e2ef18,2024-10-25 21:34:21.043,83,6.5,6.9,sports,cash,no-return,0.0,442780.63513211586,0.0,6.5,return_for_entain_mismatch
+252145,62c1387d-b4b7-414c-ae50-c6b149e2ef18,2024-10-25 21:34:21.043,83,6.5,6.9,sports,cash,no-return,0.0,442780.6351321159,0.0,6.5,return_for_entain_mismatch
 164294,0989084f-b7ee-4f69-ade1-83dd1ae471a6,2024-10-17 16:03:54.032,53,0.0,5.2,racing,cash,return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 125042,99e1d09d-57e7-41af-a53b-65ac070f510a,2024-11-01 15:29:24.039,72,0.0,21.98,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0
 74479,42055274-cbfe-4fab-a256-26b11932325b,2024-10-02 12:02:09.003,50,0.0,6.71,racing,cash,no-return,0.0,0.0,0.0,0.0,betting_amount_not_gt_0

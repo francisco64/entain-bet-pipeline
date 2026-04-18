@@ -1,58 +1,130 @@
 # Entain Bet Pipeline
 
-This project builds a small local batch pipeline around `bets.csv`.
+## Overview
 
-## What the pipeline does
+This project implements a small local batch pipeline around `bets.csv`.
 
-There are two stages.
+The task has two core stages:
 
-### 1. Validation
+1. validate the raw betting data against the business rules
+2. build a customer-level feature table from each customer’s first 20 bets
 
-The input CSV is treated as untrusted data.
+I treated this as an engineering exercise more than a pure coding exercise. The code is intentionally simple and explicit, and this README explains the main assumptions, logic, and design choices so the behavior is easy to review and defend.
 
-The validation stage reads `bets.csv` and writes:
+## What the pipeline produces
+
+### Validation stage
+
+Input:
+
+- raw `bets.csv`
+
+Outputs:
 
 - `valid_bets.parquet`
 - `invalid_bets.csv`
 - `validation_report.json`
 
-Invalid rows are not dropped silently. They stay visible in `invalid_bets.csv` with an `invalid_reasons` column. That column is a comma-separated list because one row can fail more than one rule.
+### Feature stage
 
-`invalid_bets.csv` also includes the expected values for `payout` and `return_for_entain` so formula mismatches are easy to inspect beside the actual values in the raw row.
+Input:
 
-This is a deliberate design choice. Keeping comma-separated `invalid_reasons` makes the file more useful for reporting because a single row can clearly show all failed rules in one place. Including `expected_payout` and `expected_return_for_entain` makes debugging easier because a reviewer can compare the actual values with the values implied by the business rules without having to recalculate them by hand.
+- validated bets
 
-### 2. Customer features
-
-The feature stage reads `valid_bets.parquet` and writes:
+Output:
 
 - `customer_features.parquet`
 
-This output has one row per customer.
+## Local system view
 
-## Main design choices
+The local flow is:
 
-### Raw `bet_num` is the ordering field
+1. read the raw CSV as untrusted input
+2. apply schema, domain, numeric, and formula validation
+3. split the data into:
+   - curated valid bets
+   - explicit invalid bets
+   - a machine-readable validation report
+4. build customer features only from validated bets
+5. write parquet outputs for downstream analytical use
 
-I treat `bet_num` as the source of truth for bet order because the brief says to do that.
+This is intentionally batch-oriented, local, and reproducible.
 
-### "First 20 bets" means raw bets where `bet_num <= 20`
+## Main assumptions
 
-I did not define this as "first 20 valid bets".
+These assumptions drive the implementation:
 
-Instead, I keep the early customer window fixed and only use valid bets that fall inside that raw window. If a bet inside the first 20 is invalid, I exclude it from the feature calculations, but I do not replace it with bet 21 or later.
+1. `bet_num` is the authoritative ordering field
+   The challenge explicitly says to use `bet_num` as the main ordering field, so I do not rely on `bet_datetime` for sequencing.
 
-That makes the behavior easier to explain and keeps the meaning of "first 20 bets" intact.
+2. The raw CSV is untrusted input
+   I do not assume rows are correct or that only one field can be wrong.
 
-### Validation and testing are different things
+3. Invalid records should remain inspectable
+   Invalid rows are written out explicitly instead of being silently dropped.
 
-Validation is the pipeline logic that checks the real dataset against the business rules.
+4. The feature table should represent early customer behavior
+   The customer window is defined from the raw first 20 bets, not from the first 20 valid bets.
 
-Tests are separate software checks that I would add later to verify that the validation and feature logic behave correctly on small controlled examples.
+5. `pytest` is only needed for testing
+   That is why it is placed in optional development dependencies in `pyproject.toml` rather than the runtime dependency list.
+
+## Most important design choices
+
+### 1. Invalid rows are kept explicit
+
+`invalid_bets.csv` includes:
+
+- the original row values
+- `expected_payout`
+- `expected_return_for_entain`
+- `invalid_reasons`
+
+This is deliberate.
+
+The comma-separated `invalid_reasons` field allows one row to show every failed rule in one place, which is useful for debugging and reporting.
+
+The expected formula columns make payout and return mismatches easy to inspect without recalculating them by hand.
+
+### 2. The first-20 window uses raw `bet_num <= 20`
+
+This is the central modeling choice.
+
+I did not define the feature window as “the first 20 valid bets”. Instead:
+
+- the customer window is all raw bets where `bet_num` is between 1 and 20 inclusive
+- only valid bets inside that raw window are used in feature calculations
+- invalid early bets are not replaced with later bets beyond 20
+
+Why:
+
+- it keeps the meaning of “first 20 bets” intact
+- it preserves early customer behavior instead of silently shifting the window
+- it makes the logic deterministic and easy to explain
+
+### 3. Validation and tests are different concerns
+
+Validation is part of the runtime pipeline.
+
+Tests are the safety layer around the pipeline code.
+
+That distinction matters in this project because:
+
+- validation acts on the real input dataset
+- tests check that the pipeline logic behaves correctly on known examples
+
+### 4. Pandas for validation, DuckDB for feature generation
+
+I used:
+
+- `pandas` for validation because row-level checks and explicit invalid-record handling are easy to express there
+- `DuckDB` for features because the second stage is mostly filtering and aggregation over parquet-style tabular data
+
+This felt like the simplest tool choice for the actual work being done.
 
 ## Validation rules
 
-Required columns:
+### Required columns
 
 - `bet_id`
 - `customer_id`
@@ -66,7 +138,7 @@ Required columns:
 - `payout`
 - `return_for_entain`
 
-Business rules:
+### Business rules
 
 - `betting_amount > 0`
 - `price > 1`
@@ -74,20 +146,20 @@ Business rules:
 - `stake_type` must be `cash` or `bonus`
 - `bet_result` must be `return` or `no-return`
 
-Payout rules:
+### Payout rules
 
 - `no-return` -> `payout = 0`
 - `return + cash` -> `payout = betting_amount * price`
 - `return + bonus` -> `payout = betting_amount * (price - 1)`
 
-Return for Entain rules:
+### Return for Entain rules
 
 - `no-return + cash` -> `return_for_entain = betting_amount`
 - `no-return + bonus` -> `return_for_entain = 0`
 - `return + cash` -> `return_for_entain = betting_amount - payout`
 - `return + bonus` -> `return_for_entain = -payout`
 
-Pragmatic consistency checks:
+### Pragmatic consistency checks
 
 - `bet_num` must be a positive integer
 - duplicate `bet_id` is invalid
@@ -110,6 +182,20 @@ Pragmatic consistency checks:
 | `✓` | `payout` matches the task formula | Prevents financially inconsistent rows from entering features. |
 | `✓` | `return_for_entain` matches the task formula | Prevents wrong profit/loss values from entering features. |
 
+## Validation report
+
+`validation_report.json` includes:
+
+- `total_bets_input`
+- `total_valid_bets`
+- `total_invalid_bets`
+- `unique_customers_input`
+- `unique_customers_with_valid_bets`
+- `users_removed_all_bets_invalid`
+- `invalid_by_rule`
+
+It also includes `first_20_window_health`, because the first-20-bet window is the basis of the feature table.
+
 ### First-20 window health checks
 
 | Done | Check | Why it matters |
@@ -121,32 +207,9 @@ Pragmatic consistency checks:
 | `✓` | `pct_invalid_bets_in_first_20_window` | Gives an easy quality ratio instead of only raw counts. |
 | `✓` | `users_with_invalid_first_bet` | Highlights customers whose very first recorded behavior is unusable. |
 
-## Validation report
-
-The report includes:
-
-- total input bets
-- total valid bets
-- total invalid bets
-- unique customers in the raw file
-- unique customers with at least one valid bet
-- users removed because all of their bets were invalid
-- invalid counts by rule
-
-It also includes a `first_20_window_health` section because the first 20 bets are the whole basis of the feature table.
-
-That section includes:
-
-- how the window is defined
-- how many users have at least one invalid bet in that window
-- how many raw bets fall in that window
-- how many of those are invalid
-- the percentage invalid in that window
-- how many users have an invalid first bet
-
 ## Feature table
 
-The feature output contains one row per customer and includes at least:
+The feature output contains one row per customer and includes:
 
 - `customer_id`
 - `first_bet_datetime`
@@ -164,22 +227,18 @@ The feature output contains one row per customer and includes at least:
 
 Definitions:
 
-- `bets_used` = number of valid bets actually used in the raw first-20 window
+- `bets_used` = number of valid bets actually used inside the raw first-20 window
 - `first_bet_datetime` = datetime of the first valid bet used
-- `twentieth_bet_datetime` = datetime of the valid row where `bet_num = 20`; otherwise null
+- `twentieth_bet_datetime` = datetime of the valid row where raw `bet_num = 20`; otherwise null
 
-## Why pandas for validation and DuckDB for features
+## Package structure
 
-I used pandas for validation because the job is mostly row-level checks and explicit invalid-row handling.
-
-I used DuckDB for feature generation because the second stage is just a clean tabular aggregation problem over validated data, and DuckDB works naturally with parquet.
-
-DuckDB can read the parquet file directly in the `FROM` clause, so I kept the SQL simple and did not call `read_parquet()` explicitly.
-
-## Current project files
+The solution is packaged under `src/`:
 
 ```text
 pyproject.toml
+Dockerfile
+pytest.ini
 src/
   bet_pipeline/
     __init__.py
@@ -187,24 +246,25 @@ src/
     schema.py
     validate.py
     build_features.py
+tests/
+  test_validation_pipeline.py
+  test_feature_build.py
 ```
 
-## Packaging assumptions
+## CLI
 
-I assume `pytest` is only needed for testing and not for running the pipeline itself. Because of that, it is placed under optional development dependencies in `pyproject.toml` rather than the main runtime dependency list.
+The package exposes a CLI entry point called `bet-pipeline`.
 
-## How to run the pipeline
-
-After installing the package, the CLI supports these commands:
+Supported commands:
 
 ```bash
 bet-pipeline validate --input bets.csv --output outputs/validation
 bet-pipeline build-features --input bets.csv --output outputs/features
 ```
 
-The `build-features` command takes the raw CSV input, runs validation internally, and then builds the customer feature parquet from the validated bets. This keeps the CLI aligned with the task statement while still ensuring features are built only from validated data.
+The `build-features` command accepts the raw CSV path, runs validation internally in a temporary folder, and then builds the feature parquet from validated data. I chose that interface because it matches the challenge wording while still keeping the feature stage dependent on validated bets.
 
-You can also call the Python functions directly:
+You can also run the Python functions directly:
 
 ```python
 from bet_pipeline.validate import run_validation
@@ -214,51 +274,109 @@ run_validation("bets.csv", "outputs/validation")
 run_feature_build("outputs/validation/valid_bets.parquet", "outputs/features")
 ```
 
-## Testing approach
+## Installation
 
-I want the tests to stay simple and readable, not clever.
+Package metadata is defined in `pyproject.toml`.
 
-The main validation test idea is a small hard-coded invalid dataset inside the test itself. It covers most validation rules with a tiny number of rows. Then the test runs the real validation pipeline and compares the generated `validation_report.json` with a hard-coded expected report.
+Runtime dependencies:
 
-This is useful because it tests the pipeline end to end with data that is easy to understand by eye.
+- `duckdb`
+- `numpy`
+- `pandas`
+- `pyarrow`
 
-I chose these tests because they check the most important contracts in the project:
+Testing dependency:
 
-- the validation stage should produce the expected report counts on known bad data
-- the invalid output should keep useful debugging information such as expected values and multiple invalid reasons
-- the feature stage should only use valid bets inside the raw first-20-bet window
+- `pytest` under optional development dependencies
 
-These tests are not trying to cover every possible edge case. The goal is to protect the main business rules and the main design decisions with a very small amount of readable test code.
+## Docker
 
-Current test files:
+The project includes a simple Dockerfile so the pipeline can run in a clean environment.
 
-```text
-tests/
-  test_validation_pipeline.py
-  test_feature_build.py
+Build the image:
+
+```bash
+docker build -t entain-bet-pipeline .
 ```
 
-What each test file covers:
+Run validation:
 
-- `test_validation_pipeline.py`
-  Uses a small hard-coded dataset with known invalid cases.
-  Checks that the generated `validation_report.json` matches the expected one.
-  Checks that `invalid_bets.csv` keeps `expected_payout`, `expected_return_for_entain`, and comma-separated `invalid_reasons`.
+```bash
+docker run --rm \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/outputs:/outputs \
+  entain-bet-pipeline \
+  validate --input /data/bets.csv --output /outputs/validation/
+```
 
-- `test_feature_build.py`
-  Uses a tiny valid parquet input.
-  Checks that only bets inside raw `bet_num <= 20` are used.
-  Checks that later bets are not pulled in to replace missing early bets.
-  Checks that `twentieth_bet_datetime` comes from the valid row with raw `bet_num = 20`.
+Run feature generation:
 
-How to run the tests:
+```bash
+docker run --rm \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/outputs:/outputs \
+  entain-bet-pipeline \
+  build-features --input /data/bets.csv --output /outputs/features/
+```
+
+Note on paths:
+
+- the `/data/...` and `/outputs/...` paths are container paths
+- local non-Docker runs can use either relative paths like `./bets.csv` or real absolute paths on your machine
+
+## Testing approach
+
+I wanted the tests to stay small and readable.
+
+So instead of creating a large test framework, I added two focused pytest files:
+
+### `test_validation_pipeline.py`
+
+Uses a small hard-coded dataset with known invalid cases.
+
+Why this test exists:
+
+- to check that validation counts are correct on known bad input
+- to check that `validation_report.json` matches the expected report
+- to check that `invalid_bets.csv` keeps debugging information such as `expected_payout`, `expected_return_for_entain`, and comma-separated `invalid_reasons`
+
+### `test_feature_build.py`
+
+Uses a tiny valid parquet input.
+
+Why this test exists:
+
+- to protect the most important feature-generation rule
+- to verify that only bets inside raw `bet_num <= 20` are used
+- to verify that later bets are not pulled in to replace missing early bets
+- to verify that `twentieth_bet_datetime` comes from the valid row with raw `bet_num = 20`
+
+Run tests with:
 
 ```bash
 python -m pytest -q
 ```
 
-## Notes on style
+## Engineering trade-offs
 
-I intentionally kept the code simple and explicit.
+This solution intentionally favors readability over abstraction.
 
-For this exercise I think readability matters more than squeezing everything into abstractions. The goal is that someone reviewing the project can understand the data flow quickly and that I can explain the design choices clearly in an interview.
+Examples:
+
+- validation logic is written directly instead of being hidden behind a framework
+- the test setup is hard-coded and small rather than highly reusable
+- the CLI is minimal and only supports the required commands
+- the outputs are chosen for practical inspection and downstream use, not for architectural sophistication
+
+If this were extended further, the next likely additions would be:
+
+- more tests around edge cases
+- logging and metrics around pipeline runs
+- stricter environment pinning for packaging
+- the architecture diagram and broader system design note requested in the later task sections
+
+## Final note
+
+The main objective of this submission is to make the pipeline logic easy to trust.
+
+The implementation is deliberately modest: small functions, explicit rules, inspectable outputs, and tests tied to the main business decisions. That felt more appropriate for this exercise than adding more abstraction or framework code than the task really needs.

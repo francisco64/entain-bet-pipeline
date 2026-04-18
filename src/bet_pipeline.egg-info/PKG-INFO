@@ -1,0 +1,277 @@
+Metadata-Version: 2.4
+Name: bet-pipeline
+Version: 0.1.0
+Summary: Small local batch pipeline for validating bets and building customer features
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: duckdb
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: pyarrow
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+
+# Entain Bet Pipeline
+
+This project builds a small local batch pipeline around `bets.csv`.
+
+## What the pipeline does
+
+There are two stages.
+
+### 1. Validation
+
+The input CSV is treated as untrusted data.
+
+The validation stage reads `bets.csv` and writes:
+
+- `valid_bets.parquet`
+- `invalid_bets.csv`
+- `validation_report.json`
+
+Invalid rows are not dropped silently. They stay visible in `invalid_bets.csv` with an `invalid_reasons` column. That column is a comma-separated list because one row can fail more than one rule.
+
+`invalid_bets.csv` also includes the expected values for `payout` and `return_for_entain` so formula mismatches are easy to inspect beside the actual values in the raw row.
+
+This is a deliberate design choice. Keeping comma-separated `invalid_reasons` makes the file more useful for reporting because a single row can clearly show all failed rules in one place. Including `expected_payout` and `expected_return_for_entain` makes debugging easier because a reviewer can compare the actual values with the values implied by the business rules without having to recalculate them by hand.
+
+### 2. Customer features
+
+The feature stage reads `valid_bets.parquet` and writes:
+
+- `customer_features.parquet`
+
+This output has one row per customer.
+
+## Main design choices
+
+### Raw `bet_num` is the ordering field
+
+I treat `bet_num` as the source of truth for bet order because the brief says to do that.
+
+### "First 20 bets" means raw bets where `bet_num <= 20`
+
+I did not define this as "first 20 valid bets".
+
+Instead, I keep the early customer window fixed and only use valid bets that fall inside that raw window. If a bet inside the first 20 is invalid, I exclude it from the feature calculations, but I do not replace it with bet 21 or later.
+
+That makes the behavior easier to explain and keeps the meaning of "first 20 bets" intact.
+
+### Validation and testing are different things
+
+Validation is the pipeline logic that checks the real dataset against the business rules.
+
+Tests are separate software checks that I would add later to verify that the validation and feature logic behave correctly on small controlled examples.
+
+## Validation rules
+
+Required columns:
+
+- `bet_id`
+- `customer_id`
+- `bet_datetime`
+- `bet_num`
+- `betting_amount`
+- `price`
+- `category`
+- `stake_type`
+- `bet_result`
+- `payout`
+- `return_for_entain`
+
+Business rules:
+
+- `betting_amount > 0`
+- `price > 1`
+- `category` must be `sports` or `racing`
+- `stake_type` must be `cash` or `bonus`
+- `bet_result` must be `return` or `no-return`
+
+Payout rules:
+
+- `no-return` -> `payout = 0`
+- `return + cash` -> `payout = betting_amount * price`
+- `return + bonus` -> `payout = betting_amount * (price - 1)`
+
+Return for Entain rules:
+
+- `no-return + cash` -> `return_for_entain = betting_amount`
+- `no-return + bonus` -> `return_for_entain = 0`
+- `return + cash` -> `return_for_entain = betting_amount - payout`
+- `return + bonus` -> `return_for_entain = -payout`
+
+Pragmatic consistency checks:
+
+- `bet_num` must be a positive integer
+- duplicate `bet_id` is invalid
+- duplicate `customer_id + bet_num` is invalid
+- invalid `bet_datetime` is invalid
+
+### Validation checks summary
+
+| Done | Check | Why it matters |
+| --- | --- | --- |
+| `✓` | `bet_id` is unique | Each row should represent one real bet. |
+| `✓` | `bet_datetime` is a valid datetime | Feature timestamps are not trustworthy otherwise. |
+| `✓` | `bet_num` is a positive integer | The first-20 window depends on valid ordering. |
+| `✓` | `customer_id + bet_num` is unique | A customer should not have two different bets with the same sequence number. |
+| `✓` | `betting_amount > 0` | Zero or negative stake breaks the business meaning of a bet. |
+| `✓` | `price > 1` | Decimal odds must be greater than 1 by definition. |
+| `✓` | `category` is `sports` or `racing` | Keeps the domain values consistent for features. |
+| `✓` | `stake_type` is `cash` or `bonus` | The payout rules depend on this field. |
+| `✓` | `bet_result` is `return` or `no-return` | The payout and return formulas depend on this field. |
+| `✓` | `payout` matches the task formula | Prevents financially inconsistent rows from entering features. |
+| `✓` | `return_for_entain` matches the task formula | Prevents wrong profit/loss values from entering features. |
+
+### First-20 window health checks
+
+| Done | Check | Why it matters |
+| --- | --- | --- |
+| `✓` | `window_definition` is raw `bet_num` between 1 and 20 inclusive | Makes the feature window explicit and easy to explain. |
+| `✓` | `users_with_at_least_1_invalid_bet_in_first_20` | Shows how many customers have damaged early-history data. |
+| `✓` | `total_bets_in_first_20_window` | Shows the size of the raw window used for feature quality checks. |
+| `✓` | `invalid_bets_in_first_20_window` | Shows how much bad data exists inside the most important modeling window. |
+| `✓` | `pct_invalid_bets_in_first_20_window` | Gives an easy quality ratio instead of only raw counts. |
+| `✓` | `users_with_invalid_first_bet` | Highlights customers whose very first recorded behavior is unusable. |
+
+## Validation report
+
+The report includes:
+
+- total input bets
+- total valid bets
+- total invalid bets
+- unique customers in the raw file
+- unique customers with at least one valid bet
+- users removed because all of their bets were invalid
+- invalid counts by rule
+
+It also includes a `first_20_window_health` section because the first 20 bets are the whole basis of the feature table.
+
+That section includes:
+
+- how the window is defined
+- how many users have at least one invalid bet in that window
+- how many raw bets fall in that window
+- how many of those are invalid
+- the percentage invalid in that window
+- how many users have an invalid first bet
+
+## Feature table
+
+The feature output contains one row per customer and includes at least:
+
+- `customer_id`
+- `first_bet_datetime`
+- `twentieth_bet_datetime`
+- `bets_used`
+- `total_betting_amount`
+- `mean_betting_amount`
+- `mean_price`
+- `pct_racing`
+- `pct_cash`
+- `pct_return`
+- `total_payout`
+- `total_return_for_entain`
+- `feature_generated_at`
+
+Definitions:
+
+- `bets_used` = number of valid bets actually used in the raw first-20 window
+- `first_bet_datetime` = datetime of the first valid bet used
+- `twentieth_bet_datetime` = datetime of the valid row where `bet_num = 20`; otherwise null
+
+## Why pandas for validation and DuckDB for features
+
+I used pandas for validation because the job is mostly row-level checks and explicit invalid-row handling.
+
+I used DuckDB for feature generation because the second stage is just a clean tabular aggregation problem over validated data, and DuckDB works naturally with parquet.
+
+DuckDB can read the parquet file directly in the `FROM` clause, so I kept the SQL simple and did not call `read_parquet()` explicitly.
+
+## Current project files
+
+```text
+pyproject.toml
+src/
+  bet_pipeline/
+    __init__.py
+    cli.py
+    schema.py
+    validate.py
+    build_features.py
+```
+
+## Packaging assumptions
+
+I assume `pytest` is only needed for testing and not for running the pipeline itself. Because of that, it is placed under optional development dependencies in `pyproject.toml` rather than the main runtime dependency list.
+
+## How to run the pipeline
+
+After installing the package, the CLI supports these commands:
+
+```bash
+bet-pipeline validate --input bets.csv --output outputs/validation
+bet-pipeline build-features --input bets.csv --output outputs/features
+```
+
+The `build-features` command takes the raw CSV input, runs validation internally, and then builds the customer feature parquet from the validated bets. This keeps the CLI aligned with the task statement while still ensuring features are built only from validated data.
+
+You can also call the Python functions directly:
+
+```python
+from bet_pipeline.validate import run_validation
+from bet_pipeline.build_features import run_feature_build
+
+run_validation("bets.csv", "outputs/validation")
+run_feature_build("outputs/validation/valid_bets.parquet", "outputs/features")
+```
+
+## Testing approach
+
+I want the tests to stay simple and readable, not clever.
+
+The main validation test idea is a small hard-coded invalid dataset inside the test itself. It covers most validation rules with a tiny number of rows. Then the test runs the real validation pipeline and compares the generated `validation_report.json` with a hard-coded expected report.
+
+This is useful because it tests the pipeline end to end with data that is easy to understand by eye.
+
+I chose these tests because they check the most important contracts in the project:
+
+- the validation stage should produce the expected report counts on known bad data
+- the invalid output should keep useful debugging information such as expected values and multiple invalid reasons
+- the feature stage should only use valid bets inside the raw first-20-bet window
+
+These tests are not trying to cover every possible edge case. The goal is to protect the main business rules and the main design decisions with a very small amount of readable test code.
+
+Current test files:
+
+```text
+tests/
+  test_validation_pipeline.py
+  test_feature_build.py
+```
+
+What each test file covers:
+
+- `test_validation_pipeline.py`
+  Uses a small hard-coded dataset with known invalid cases.
+  Checks that the generated `validation_report.json` matches the expected one.
+  Checks that `invalid_bets.csv` keeps `expected_payout`, `expected_return_for_entain`, and comma-separated `invalid_reasons`.
+
+- `test_feature_build.py`
+  Uses a tiny valid parquet input.
+  Checks that only bets inside raw `bet_num <= 20` are used.
+  Checks that later bets are not pulled in to replace missing early bets.
+  Checks that `twentieth_bet_datetime` comes from the valid row with raw `bet_num = 20`.
+
+How to run the tests:
+
+```bash
+python -m pytest -q
+```
+
+## Notes on style
+
+I intentionally kept the code simple and explicit.
+
+For this exercise I think readability matters more than squeezing everything into abstractions. The goal is that someone reviewing the project can understand the data flow quickly and that I can explain the design choices clearly in an interview.
