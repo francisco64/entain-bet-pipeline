@@ -1,7 +1,7 @@
 from pathlib import Path
+from datetime import datetime, timezone
 
 import duckdb
-import pandas as pd
 
 from bet_pipeline.schema import FIRST_20_MAX_BET_NUM
 
@@ -19,7 +19,7 @@ WITH first_20_valid_bets AS (
         bet_result,
         payout,
         return_for_entain
-    FROM read_parquet('{valid_bets_path}')
+    FROM '{valid_bets_path}'
     WHERE bet_num >= 1 AND bet_num <= {first_20_max_bet_num}
 ),
 ordered_bets AS (
@@ -51,7 +51,7 @@ ORDER BY customer_id
 
 
 def build_customer_features(valid_bets_path):
-    valid_bets_path = str(Path(valid_bets_path)).replace("'", "''")
+    valid_bets_path = str(valid_bets_path).replace("'", "''")
     query = FEATURE_QUERY.format(
         valid_bets_path=valid_bets_path,
         first_20_max_bet_num=FIRST_20_MAX_BET_NUM,
@@ -63,7 +63,7 @@ def build_customer_features(valid_bets_path):
     finally:
         connection.close()
 
-    features["feature_generated_at"] = pd.Timestamp.utcnow().replace(tzinfo=None)
+    features["feature_generated_at"] = datetime.now(timezone.utc)
     return features
 
 

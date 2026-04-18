@@ -29,7 +29,7 @@ def load_bets_csv(input_path):
 
     df["bet_datetime"] = pd.to_datetime(df["bet_datetime"], errors="coerce")
 
-    return df.reset_index(drop=True)
+    return df
 
 
 def calculate_expected_payout(df):
@@ -69,19 +69,23 @@ def calculate_expected_return_for_entain(df, expected_payout):
 
 
 def validate_bets(df):
-    #remove?
+    # Reset the index here because validate_bets can be called directly.
     df = df.copy().reset_index(drop=True)
-    #checks, nan, >0, integer
+
+    # bet_num > 0 and integer
     bet_num_is_positive_integer = (
         df["bet_num"].notna()
         & (df["bet_num"] > 0)
         & np.isclose(df["bet_num"] % 1, 0.0, atol=FLOAT_TOLERANCE)
     )
-    #calculates expected payout and entain return based on definitions
+
+    # Expected payout and return_for_entain from the task rules
     expected_payout = calculate_expected_payout(df)
     expected_return_for_entain = calculate_expected_return_for_entain(df, expected_payout)
+    df["expected_payout"] = expected_payout
+    df["expected_return_for_entain"] = expected_return_for_entain
 
-    #nan and domain contrain checks
+    # Fields needed before checking payout formulas
     calculation_inputs_are_valid = (
         df["betting_amount"].notna()
         & df["price"].notna()
@@ -90,27 +94,38 @@ def validate_bets(df):
     )
 
     validation_rules = {
+        # bet_id must be unique
         "duplicate_bet_id": df["bet_id"].duplicated(keep=False),
+        # bet_datetime must be a valid datetime
         "invalid_bet_datetime": df["bet_datetime"].isna(),
+        # bet_num must be a positive integer
         "bet_num_not_positive_integer": ~bet_num_is_positive_integer,
+        # customer_id + bet_num must be unique
         "duplicate_customer_bet_num": (
             df["customer_id"].notna()
             & bet_num_is_positive_integer
             & df.duplicated(subset=["customer_id", "bet_num"], keep=False)
         ),
+        # betting_amount > 0
         "betting_amount_not_gt_0": ~(df["betting_amount"] > 0),
+        # price > 1
         "price_not_gt_1": ~(df["price"] > 1),
+        # category in {sports, racing}
         "invalid_category": ~df["category"].isin(ALLOWED_CATEGORIES),
+        # stake_type in {cash, bonus}
         "invalid_stake_type": ~df["stake_type"].isin(ALLOWED_STAKE_TYPES),
+        # bet_result in {return, no-return}
         "invalid_bet_result": ~df["bet_result"].isin(ALLOWED_BET_RESULTS),
+        # payout must match the business rule formula
         "payout_mismatch": calculation_inputs_are_valid
-        & ~np.isclose( #expected and real are not close
+        & ~np.isclose(
             df["payout"],
             expected_payout,
             atol=FLOAT_TOLERANCE,
             rtol=0.0,
             equal_nan=False,
         ),
+        # return_for_entain must match the business rule formula
         "return_for_entain_mismatch": calculation_inputs_are_valid
         & ~np.isclose(
             df["return_for_entain"],
@@ -121,7 +136,7 @@ def validate_bets(df):
         ),
     }
 
-    #for each invalid rule category has records where it happens and joins all reasons
+    # Collect every failed rule for each row
     invalid_reasons = [[] for _ in range(len(df))]
 
     for rule_name, failed_rows in validation_rules.items():
@@ -132,13 +147,21 @@ def validate_bets(df):
     df["is_valid"] = df["invalid_reasons"] == ""
 
     valid_bets = df.loc[df["is_valid"], REQUIRED_COLUMNS].copy()
-    invalid_bets = df.loc[~df["is_valid"], REQUIRED_COLUMNS + ["invalid_reasons"]].copy()
+    invalid_bets = df.loc[
+        ~df["is_valid"],
+        REQUIRED_COLUMNS
+        + [
+            "expected_payout",
+            "expected_return_for_entain",
+            "invalid_reasons",
+        ],
+    ].copy()
 
     total_bets_input = int(len(df))
     total_valid_bets = int(df["is_valid"].sum())
     total_invalid_bets = total_bets_input - total_valid_bets
 
-    #since user level features are obtained from 20 first bets, checks are added (this should be part of the readme)
+    # Health metrics for the raw first-20-bet window
     first_20_bets = df.loc[
         bet_num_is_positive_integer & (df["bet_num"] <= FIRST_20_MAX_BET_NUM),
         ["customer_id", "bet_num", "is_valid"],

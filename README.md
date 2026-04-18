@@ -20,6 +20,10 @@ The validation stage reads `bets.csv` and writes:
 
 Invalid rows are not dropped silently. They stay visible in `invalid_bets.csv` with an `invalid_reasons` column. That column is a comma-separated list because one row can fail more than one rule.
 
+`invalid_bets.csv` also includes the expected values for `payout` and `return_for_entain` so formula mismatches are easy to inspect beside the actual values in the raw row.
+
+This is a deliberate design choice. Keeping comma-separated `invalid_reasons` makes the file more useful for reporting because a single row can clearly show all failed rules in one place. Including `expected_payout` and `expected_return_for_entain` makes debugging easier because a reviewer can compare the actual values with the values implied by the business rules without having to recalculate them by hand.
+
 ### 2. Customer features
 
 The feature stage reads `valid_bets.parquet` and writes:
@@ -92,6 +96,33 @@ Pragmatic consistency checks:
 - duplicate `customer_id + bet_num` is invalid
 - invalid `bet_datetime` is invalid
 
+### Validation checks summary
+
+| Done | Check | Why it matters |
+| --- | --- | --- |
+| `✓` | `bet_id` is unique | Each row should represent one real bet. |
+| `✓` | `bet_datetime` is a valid datetime | Feature timestamps are not trustworthy otherwise. |
+| `✓` | `bet_num` is a positive integer | The first-20 window depends on valid ordering. |
+| `✓` | `customer_id + bet_num` is unique | A customer should not have two different bets with the same sequence number. |
+| `✓` | `betting_amount > 0` | Zero or negative stake breaks the business meaning of a bet. |
+| `✓` | `price > 1` | Decimal odds must be greater than 1 by definition. |
+| `✓` | `category` is `sports` or `racing` | Keeps the domain values consistent for features. |
+| `✓` | `stake_type` is `cash` or `bonus` | The payout rules depend on this field. |
+| `✓` | `bet_result` is `return` or `no-return` | The payout and return formulas depend on this field. |
+| `✓` | `payout` matches the task formula | Prevents financially inconsistent rows from entering features. |
+| `✓` | `return_for_entain` matches the task formula | Prevents wrong profit/loss values from entering features. |
+
+### First-20 window health checks
+
+| Done | Check | Why it matters |
+| --- | --- | --- |
+| `✓` | `window_definition` is raw `bet_num` between 1 and 20 inclusive | Makes the feature window explicit and easy to explain. |
+| `✓` | `users_with_at_least_1_invalid_bet_in_first_20` | Shows how many customers have damaged early-history data. |
+| `✓` | `total_bets_in_first_20_window` | Shows the size of the raw window used for feature quality checks. |
+| `✓` | `invalid_bets_in_first_20_window` | Shows how much bad data exists inside the most important modeling window. |
+| `✓` | `pct_invalid_bets_in_first_20_window` | Gives an easy quality ratio instead of only raw counts. |
+| `✓` | `users_with_invalid_first_bet` | Highlights customers whose very first recorded behavior is unusable. |
+
 ## Validation report
 
 The report includes:
@@ -144,6 +175,8 @@ Definitions:
 I used pandas for validation because the job is mostly row-level checks and explicit invalid-row handling.
 
 I used DuckDB for feature generation because the second stage is just a clean tabular aggregation problem over validated data, and DuckDB works naturally with parquet.
+
+DuckDB can read the parquet file directly in the `FROM` clause, so I kept the SQL simple and did not call `read_parquet()` explicitly.
 
 ## Current project files
 
