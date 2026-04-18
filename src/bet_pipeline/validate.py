@@ -17,6 +17,11 @@ from bet_pipeline.schema import (
 
 def load_bets_csv(input_path):
     df = pd.read_csv(input_path)
+    return prepare_bets_dataframe(df)
+
+
+def prepare_bets_dataframe(df):
+    df = df.copy()
 
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing_columns:
@@ -216,11 +221,12 @@ def validate_bets(df):
     return valid_bets, invalid_bets, validation_report
 
 
-def run_validation(input_path, output_dir):
+def run_validation(input_path, output_dir, bets_df=None):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    bets = load_bets_csv(input_path)
+    bets = prepare_bets_dataframe(bets_df) if bets_df is not None else load_bets_csv(input_path)
+
     valid_bets, invalid_bets, validation_report = validate_bets(bets)
 
     valid_bets.to_parquet(output_dir / "valid_bets.parquet", index=False)

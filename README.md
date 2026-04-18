@@ -201,6 +201,49 @@ run_validation("bets.csv", "outputs/validation")
 run_feature_build("outputs/validation/valid_bets.parquet", "outputs/features")
 ```
 
+## Testing approach
+
+I want the tests to stay simple and readable, not clever.
+
+The main validation test idea is a small hard-coded invalid dataset inside the test itself. It covers most validation rules with a tiny number of rows. Then the test runs the real validation pipeline and compares the generated `validation_report.json` with a hard-coded expected report.
+
+This is useful because it tests the pipeline end to end with data that is easy to understand by eye.
+
+I chose these tests because they check the most important contracts in the project:
+
+- the validation stage should produce the expected report counts on known bad data
+- the invalid output should keep useful debugging information such as expected values and multiple invalid reasons
+- the feature stage should only use valid bets inside the raw first-20-bet window
+
+These tests are not trying to cover every possible edge case. The goal is to protect the main business rules and the main design decisions with a very small amount of readable test code.
+
+Current test files:
+
+```text
+tests/
+  test_validation_pipeline.py
+  test_feature_build.py
+```
+
+What each test file covers:
+
+- `test_validation_pipeline.py`
+  Uses a small hard-coded dataset with known invalid cases.
+  Checks that the generated `validation_report.json` matches the expected one.
+  Checks that `invalid_bets.csv` keeps `expected_payout`, `expected_return_for_entain`, and comma-separated `invalid_reasons`.
+
+- `test_feature_build.py`
+  Uses a tiny valid parquet input.
+  Checks that only bets inside raw `bet_num <= 20` are used.
+  Checks that later bets are not pulled in to replace missing early bets.
+  Checks that `twentieth_bet_datetime` comes from the valid row with raw `bet_num = 20`.
+
+How to run the tests:
+
+```bash
+python -m pytest -q
+```
+
 ## Notes on style
 
 I intentionally kept the code simple and explicit.
